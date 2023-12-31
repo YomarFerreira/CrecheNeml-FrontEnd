@@ -31,7 +31,7 @@ const Home = React.memo(() => {
     const [showPhotoModal, setShowPhotoModal] = useState(false);
     const [selectedChildForPhoto, setSelectedChildForPhoto] = useState(null);
     const [tempSelectedFile, setTempSelectedFile] = useState(null);
-    const [defaultPhotoBase64, setDefaultPhotoBase64] = useState(null);
+    const [defaultPhotoBase64] = useState(null);
     const [childPhotos, setChildPhotos] = useState({});
     const [photoLoading, setPhotoLoading] = useState(true);
     const [imageLoaded, setImageLoaded] = useState(false);
