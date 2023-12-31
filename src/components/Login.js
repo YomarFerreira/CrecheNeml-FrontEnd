@@ -10,7 +10,6 @@ function Login(){
 
     const[userName, setUserName] = useState('');
     const[password, setPassword] = useState('');
-    const [user, setUser] = useState(null);
 
     const navigate = useNavigate();
 
