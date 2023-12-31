@@ -5,6 +5,9 @@ import { Button } from 'reactstrap';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
+import config from '../Config.js';
+
+const pathApiUrl = config.pathApiUrl;
 
 function Login(){
 
@@ -18,7 +21,7 @@ function Login(){
         console.log(userName, password)
 
         try{
-            const response = await axios.post('http://localhost:3000/auth/login',
+            const response = await axios.post(`${pathApiUrl}/auth/login`,
                 JSON.stringify(
                     {
                         username: userName,
