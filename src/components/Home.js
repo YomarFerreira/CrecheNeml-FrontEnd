@@ -94,7 +94,7 @@ const Home = React.memo(() => {
             }
         };
         fetchData();
-    }, [checkAuthentication, fetchChildrenData]);
+    }, []);
 
     useEffect(() => {
         if (error) {
