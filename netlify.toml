@@ -1,2 +1,3 @@
 [build]
-  ignore_warnings = true
+  command = "npm run build"  # comando para construir o frontend
+  publish = "FrontEnd_React/"  # diretório de construção

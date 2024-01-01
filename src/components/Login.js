@@ -1,34 +1,16 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import { Button, Spinner } from 'reactstrap';
+import { Button } from 'reactstrap';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-import config from '../Config.js';
-
-const pathApiUrl = config.pathApiUrl;
 
 function Login(){
 
     const[userName, setUserName] = useState('');
     const[password, setPassword] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
-
-    useEffect(() => {
-        let timer;
-        if (loading) {
-            timer = setTimeout(() => {
-                setMessage('Conectando à base de dados. Aguarde...');
-            }, 5000);
-        }
-    
-        return () => {
-            clearTimeout(timer);
-        };
-    }, [loading]);
-
+    const [user, setUser] = useState(null);
 
     const navigate = useNavigate();
 
@@ -37,9 +19,7 @@ function Login(){
         console.log(userName, password)
 
         try{
-            setLoading(true);
-
-            const response = await axios.post(`${pathApiUrl}/auth/login`,
+            const response = await axios.post('http://localhost:3000/auth/login',
                 JSON.stringify(
                     {
                         username: userName,
@@ -70,9 +50,6 @@ function Login(){
                 console.error(error);
             }
         }
-        finally{
-            setLoading(false);
-        }
     }
 
     return(
@@ -94,18 +71,8 @@ function Login(){
                 <Button color="info"
                         type="submit"
                         className='btn-login'
-                        onClick={(e)=> handleLogin(e)}>
-                        {loading ? (
-                            <>
-                                <Spinner size="sm" className="mr-2" />
-                            </>
-                        ) : (
-                            "Login"
-                        )}
-                </Button>
+                        onClick={(e)=> handleLogin(e)}>Login</Button>
             </form>
-
-            {message && <p>{message}</p>}
 
             <ToastContainer
                 position="top-center"

@@ -96,11 +96,18 @@ input[type="userName"]:focus {
   width: 100%;
   padding: 20px;
 }
+
 .btn-login:hover {
   background-color: #329dd5;
   -webkit-transition: all 0.2s ease;
   transition: all 0.2s ease;
 }
+
 .hidden {
   display: none;
+}
+
+.photo-container {
+  border-radius: 50%;
+  overflow: hidden;
 }
