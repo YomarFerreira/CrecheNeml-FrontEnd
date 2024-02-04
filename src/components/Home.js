@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { format, addHours, parseISO } from 'date-fns';
 import { ToastContainer, toast } from 'react-toastify';
 import { Button, Modal, ModalHeader, ModalBody, ModalFooter } from 'reactstrap';
-import { MdCheckCircle, MdCancel, MdAddCircle, MdDeleteOutline, MdModeEditOutline, MdAddAPhoto } from 'react-icons/md';
+import { MdCheckCircle, MdCancel, MdAddCircle, MdSettings, MdDeleteOutline, MdModeEditOutline, MdAddAPhoto } from 'react-icons/md';
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
 import isValidDate from 'date-fns/isValid';
 import { maskPhone, maskPersonalRegister, maskZipCode} from './MaskFunctions';
+import 'react-toastify/dist/ReactToastify.css';
 
 import config from '../Config.js';
 
@@ -16,6 +17,7 @@ const pathApiUrl = config.pathApiUrl;
 
 const Home = React.memo(() => {
     const navigate = useNavigate();
+    const [currentUsername, setCurrentUsername] = useState(null);
     const [children, setChildren] = useState([]);
     const [showFormModal, setShowFormModal] = useState(false);
     
@@ -26,7 +28,16 @@ const Home = React.memo(() => {
     const [childToDeleteName, setChildToDeleteName] = useState(null);
     const [error, setError] = useState(null);
     const [buttonEnabled, setButtonEnabled] = useState(false);
-    
+
+    const [userData, setUserData] = useState([]);
+    const [newUser, setNewUser] = useState(null);
+    const [editUser, setEditUser] = useState(null);
+    const [showFormModalUsers, setShowFormModalUsers] = useState(false);
+    const [showFormModalPermissions, setShowFormModalPermissions] = useState(false);
+    const [showDeleteModalUser, setDeleteShowModalUser] = useState(false);
+    const [userToDelete, setUserToDelete] = useState(null);
+    const [userToDeleteName, setUserToDeleteName] = useState(null);
+
     const [selectedFile, setSelectedFile] = useState(null);
     const [showPhotoModal, setShowPhotoModal] = useState(false);
     const [selectedChildForPhoto, setSelectedChildForPhoto] = useState(null);
@@ -48,8 +59,10 @@ const Home = React.memo(() => {
             try {
                 const decodedToken = jwtDecode(token);
                 const userRole = decodedToken.role;
-                console.log("Papel do usuário: ", userRole);
+                setCurrentUsername(decodedToken.username);
                 setButtonEnabled(userRole === "admin");
+                console.log("Papel do usuário: ", userRole);
+                console.log("usuário: ", decodedToken.username);
             } catch (error) {
                 console.error("Erro ao decodificar o token: ", error);
             }
@@ -113,19 +126,23 @@ const Home = React.memo(() => {
         });
         setShowFormModal(true);
     }
+
     const handleCloseFormModal = () => {
         setShowFormModal(false);
         setEditChild(null);
     };
+
     const handleShowDeleteModal = (childId, childName) => {
         setChildToDelete(childId);
         setChildToDeleteName(childName);
         setDeleteShowModal(true);
 
     };
+
     const handleCloseDeleteModal = () => {
         setDeleteShowModal(false);
-    }
+    };
+
     const handleEditChild = async (childId) => {
         try {
             const response = await axios.get(`${pathApiUrl}/child/${childId}`);
@@ -199,7 +216,7 @@ const Home = React.memo(() => {
             const reader = new FileReader();
             reader.onloadend = () => {
                 setSelectedFile(reader.result);
-                console.log('@@@@@@@@inseriu ', file)
+                console.log('Insert OK ', file)
                 setTempSelectedFile(file);
                 setShowPhotoModal(true);
             };
@@ -237,6 +254,147 @@ const Home = React.memo(() => {
         }
     };
 
+    useEffect(() => {
+        const fetchData = async () => {
+            try {
+                await checkAuthentication();
+                const response = await axios.get(`${pathApiUrl}/users`);
+                setUserData(response.data);
+                setError(null);
+            } catch (error) {
+                console.error("Erro ao buscar dados dos usuários: ", error);
+            }
+        };
+
+        if (showFormModalUsers) {
+            fetchData();
+        }
+    }
+    , [showFormModalUsers, newUser, editUser, userToDelete]);
+
+    const handleShowFormModalUsers = async () => {
+        try {
+            setShowFormModalUsers(true);
+
+        } catch (error) {
+            console.error("Erro ao buscar dados dos usuários: ", error);
+        }
+    };
+        
+    const handleCloseFormModalUsers = () => {
+        setShowFormModalUsers(false);
+    };
+ 
+    const handleShowDeleteModalUser = (userId, username) => {
+        setUserToDelete(userId);
+        setUserToDeleteName(username);
+        setDeleteShowModalUser(true);
+    };
+
+    const handleCloseDeleteModalUser = () => {
+        setDeleteShowModalUser(false);
+    };
+
+    const handleSaveUsers = async () => {
+        try {
+            if (!editUser) {
+                await handlePostUser(newUser);
+            }
+            await handleUpdateUser(editUser);
+
+        } catch (error) {
+            console.error("Erro ao salvar usuário: ", error);
+        }
+    };
+
+    const handleDeleteUser = async () => {
+        try {
+            if (userToDelete) {
+                await axios.delete(`${pathApiUrl}/auth/delete/${userToDelete}`);
+                handleCloseDeleteModalUser();
+                setUserToDelete(null);
+                setUserToDeleteName(null);
+                setShowFormModalUsers(true);
+            }
+        } catch (error) {
+            console.error("Erro ao excluir a usuário: ", error);
+        }
+    };
+
+    const handlePostUser = async (user) => {
+        try {
+            if (!user.username || !user.password || !user.confirmPassword || !user.role || user.role == "") {
+                toast.warn('Preencha todos os campos!', { position: "top-center" });
+                return;
+            }
+    
+            if (user.password !== user.confirmPassword) {
+                toast.warn('As senhas não coincidem!', { position: "top-center" });
+                return;
+            }
+    
+            await axios.post(`${pathApiUrl}/auth/register`, user);
+    
+            toast.warn('Novo usuário criado com sucesso!', { position: "top-center" });
+    
+            handleCloseFormModalPermissions();
+        } catch (error) {
+            console.error("Erro ao criar o usuário: ", error);
+        }
+    };
+
+    const handleUpdateUser = async (user) => {
+        try {
+            const responseUser = await axios.get(`${pathApiUrl}/user/${user._id}`);
+            var userIni = responseUser.data.user;
+
+            if ((user.username === userIni.username ) && (user.role === userIni.role ) && (!user.password)){
+                toast.warn('Nenhum campo foi alterado!', { position: "top-center" });
+                return;
+            }
+   
+            if (user.password !== user.confirmPassword) {
+                toast.warn('As senhas não coincidem!', { position: "top-center" });
+                return;
+            }
+    
+            await axios.put(`${pathApiUrl}/auth/update/:id`, user);
+    
+            toast.warn('Usuário atualizado com sucesso!', { position: "top-center" });
+    
+            handleCloseFormModalPermissions();
+        } catch (error) {
+            console.error("Erro ao atualizar o usuário: ", error);
+        }
+    };
+
+    const handleEditUser = async (userId) => {
+        try {
+            const response = await axios.get(`${pathApiUrl}/user/${userId}`);
+            setEditUser(response.data.user);
+            setNewUser(null);
+            setShowFormModalPermissions(true);
+        } catch (error) {
+            console.error("Erro ao buscar dados do usuário: ", error);
+        }
+    };
+
+    const handleShowFormModalPermissions = () => {
+        console.log("editUser:", editUser);
+        if (editUser) {
+            setNewUser({ ...editUser }); 
+        } else {
+            setNewUser(null);
+        }
+        console.log("newUser:", newUser);
+        setShowFormModalPermissions(true);
+    }
+    const handleCloseFormModalPermissions = () => {
+        setNewUser(null);
+        setEditUser(null); 
+        setShowFormModalPermissions(false);
+    };
+
       
     return(
 
@@ -253,6 +411,10 @@ const Home = React.memo(() => {
             pauseOnHover
             theme="colored"
             />
+
+            {
+            /* Modal Uso de Foto em Childrens */
+            }
 
             {selectedChildForPhoto && (
                 <Modal isOpen={showPhotoModal} toggle={() => setShowPhotoModal(false)} size="lg">
@@ -278,6 +440,11 @@ const Home = React.memo(() => {
                 </Modal>
             )}
 
+            {
+            /* Modal Exclusão de Childrens */
+            }
+
+
             <Modal isOpen={showDeleteModal} toggle={handleCloseDeleteModal}>
               <ModalHeader toggle={handleCloseDeleteModal}>Exclusão</ModalHeader>
               <ModalBody>Tem certeza que deseja excluir a crian&ccedil;a <strong>{childToDeleteName}</strong>?</ModalBody>
@@ -290,6 +457,10 @@ const Home = React.memo(() => {
                 </Button>
               </ModalFooter>
             </Modal>
+
+            {
+            /* Modal Criação e Edição de Childrens */
+            }
 
             <Modal isOpen={showFormModal} toggle={handleCloseFormModal} size="xl" backdrop="static">
             <ModalHeader toggle={handleCloseFormModal}> {editChild ? `Edição de Registro` : `Novo Registro` }</ModalHeader>
@@ -654,15 +825,173 @@ const Home = React.memo(() => {
             </ModalFooter>
             </Modal>
 
-            <div id="div-header" className="container mb-4 bg-secondary" style={{ position: 'fixed', background:'#FFFFFF', top: 0, left: 0, right: 0, zIndex: 1000, 
-                                          display:'flex', alignItems:'center', marginTop:'0px', justifyContent:'space-between',
-                                       }}>
+
+            {
+            /* Modal Exclusão de Users */
+            }
+
+            <Modal isOpen={showDeleteModalUser} toggle={handleCloseDeleteModalUser}>
+              <ModalHeader toggle={handleCloseDeleteModal}>Exclusão</ModalHeader>
+              <ModalBody>Tem certeza que deseja excluir o usu&aacute;rio <strong>{userToDeleteName}</strong>?</ModalBody>
+              <ModalFooter>
+                <Button color="secondary" onClick={handleCloseDeleteModalUser}>
+                    <MdCancel style={{marginBottom:'3px'}}/> Cancelar
+                </Button>
+                <Button color="primary" onClick={() => handleDeleteUser()}>
+                    <MdCheckCircle style={{marginBottom:'3px'}}/> Confirmar
+                </Button>
+              </ModalFooter>
+            </Modal>
+
+            {
+            /* Modal Users */
+            }
+
+            <Modal isOpen={showFormModalUsers} toggle={handleCloseFormModalUsers} size="x" backdrop="static">
+                <ModalHeader toggle={handleCloseFormModalUsers} style={{ width: '100%'}}>
+                    Usu&aacute;rios
+                </ModalHeader>
+                <ModalBody style={{ maxHeight: '370px', overflowY:"scroll"}}>
+                    <div style={{textAlign:'right', paddingBottom: '9px'}} >
+                        <Button color="primary" onClick={handleShowFormModalPermissions} disabled={!buttonEnabled}>
+                            <MdAddCircle style={{marginBottom:'4px'}}/> Novo 
+                        </Button>   
+                    </div>
+                    {userData && userData.users && userData.users.map((loginUser, index) => (
+                        <div key={loginUser._id} className="container mb-1" style={{overflowY:'auto', background: index % 2 === 0 ? '#e0e0e0' : '#f0f0f0' }}>
+                            <div className="row align-items-center" style={{padding:'5px'}}>
+                                <div className="col-md-10">
+                                    <div className="row mb-1">
+                                        <div className="col-md-auto">Login: <span className="lead" style={{fontSize:'1rem'}}> {loginUser.username}</span></div>
+                                        <div className="col-md-auto">Permiss&otilde;es: <span className="lead" style={{fontSize:'1rem'}}>{ loginUser.role == `admin` ? 'Administrador' : 'Usuário' }</span></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="container-fluid" style={{paddingBottom:'1px'}}>
+                                <div key={loginUser._id} className="container mb-3">
+                                    <Button color="success" onClick={() => handleEditUser(loginUser._id)} style={{marginRight:'5px'}} disabled={currentUsername != 'Super' && currentUsername != loginUser.username && loginUser.role !== "user"}>
+                                        <MdModeEditOutline style={{marginBottom:'1px'}}/> Editar
+                                    </Button>   
+
+                                    <Button color="danger" onClick={() => handleShowDeleteModalUser(loginUser._id, loginUser.username)} style={{marginLeft:'5px'}} disabled={currentUsername != 'Super' && currentUsername != loginUser.username && loginUser.role !== "user"}>
+                                        <MdDeleteOutline style={{marginBottom:'1px'}}/> Excluir
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </ModalBody>
+            </Modal>
+
+            {
+            /* Modal Criação e Edição de Users */
+            }
+
+            <Modal isOpen={showFormModalPermissions} toggle={handleCloseFormModalPermissions} size="x" backdrop="static">
+                <ModalHeader toggle={handleCloseFormModalPermissions}> {editUser ? `Edição de Usuário` : `Novo Usuário` }</ModalHeader>
+                <ModalBody>
+                    <form>
+                        <div className="form-group">
+                            {editUser ? 
+                                <input type="text" hidden className="form-control" readOnly id="id" value={editUser._id}/> 
+                            :
+                                ''
+                            }
+                            <div className="row" style={{background:'#e0e0e0', minHeight:'80px'}}>
+                                <div className="col-md-6">
+                                    <label for="recipient-username" className="col-form-label" style={{marginBottom:'1px', paddingBottom: '1px'}}>Usu&aacute;rio:</label>
+                                    {editUser ? 
+                                        <input type="text" className="form-control" id="username" style={{height:'35px', color:'#888888'}} maxlength="15"
+                                            defaultValue={editUser.username} disabled
+                                            onLoadStart={(e) => {setEditUser({ ...editUser, username: e.target.value });}}
+                                        />
+                                    :
+                                        <input type="text" className="form-control" id="username" style={{height:'35px'}} maxlength="15"
+                                            onChange={(e) => {setNewUser({ ...newUser, username: e.target.value });}}
+                                        />
+                                    }
+                                </div>
+                            </div>
+                            <div className="row" style={{background:'#e9e9e9', minHeight:'80px'}}>
+                                <div className="col-md-6">
+                                    <label for="recipient-password" className="col-form-label" style={{marginBottom:'1px', paddingBottom: '1px'}}>Senha:</label>
+                                    {editUser ? 
+                                        <input type="password" className="form-control" id="password" style={{height:'35px', backgroundColor: '#fff'}} maxLength="25"
+                                            defaultValue={editUser.password}
+                                            onChange={(e) => {setEditUser({ ...editUser, password: e.target.value });}}
+                                        />
+                                    :
+                                        <input type="password" className="form-control" id="password" style={{height:'35px', backgroundColor: '#fff'}} maxLength="25"
+                                            onChange={(e) => {setNewUser({ ...newUser, password: e.target.value });}}
+                                        />
+                                    }
+                                </div>
+                                <div className="col-md-6">
+                                    <label for="recipient-password-confirm" className="col-form-label" style={{marginBottom:'1px', paddingBottom: '1px'}}>Confirma&ccedil;&atilde;o de Senha:</label>
+                                    {editUser ? 
+                                        <input type="password" className="form-control" id="confirmPassword" style={{height:'35px', backgroundColor: '#fff'}} maxLength="25"
+                                            defaultValue={editUser.confirmPassword}
+                                            onChange={(e) => {setEditUser({ ...editUser, confirmPassword: e.target.value });}}
+                                        />
+                                    :
+                                        <input type="password" className="form-control" id="confirmPassword" style={{height:'35px', backgroundColor: '#fff'}} maxLength="25"
+                                            onChange={(e) => {setNewUser({ ...newUser, confirmPassword: e.target.value });}}
+                                        />
+                                    }
+                                </div>
+                            </div>
+                            <div className="row" style={{background:'#e0e0e0', minHeight:'80px'}}>
+                                <div className="col-md-6">
+                                    <label for="recipient-roles" className="col-form-label" style={{marginBottom:'1px', paddingBottom: '1px'}}>Permiss&otilde;es:</label>
+                                    {editUser ?
+                                        <select className="form-select form-select-sm" id="role" style={{height:'35px'}}
+                                            onChange={(e) => {setEditUser({ ...editUser, role: e.target.value });}}>
+                                            <option value="user" selected={editUser.role === 'user' ? 'selected' : ''}>Usu&aacute;rio</option>
+                                            <option value="admin" selected={editUser.role === 'admin' ? 'selected' : ''}>Administrador</option>
+                                        </select>
+                                    :
+                                        <select className="form-select form-select-sm" id="role" style={{height:'35px'}}
+                                            onChange={(e) => {setNewUser({ ...newUser, role: e.target.value });}}>
+                                            <option value=""></option>
+                                            <option value="user">Usu&aacute;rio</option>
+                                            <option value="admin">Administrador</option>
+                                        </select>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </ModalBody>
+                <ModalFooter style={{background:'#e0e0e0'}}>
+                    <Button color="secondary" onClick={handleCloseFormModalPermissions}>
+                        <MdCancel style={{marginBottom:'3px'}}/> Fechar 
+                    </Button>
+                    <Button color="primary" onClick={handleSaveUsers}>
+                        <MdCheckCircle style={{marginBottom:'3px'}}/> Gravar
+                    </Button>
+                </ModalFooter>
+            </Modal>
+
+            {
+            /* Home Principal */
+            }
+
+            <div id="div-header" className="container mb-4 bg-secondary" style={{ position: 'fixed', background:'#FFFFFF', top: 0, left: 0, right: 0, zIndex: 1000, display:'flex', 
+                                                                                  alignItems:'center', marginTop:'0px', justifyContent:'space-between'}}>
 
                 <h1 className="h1" style={{color:'#FFF'}}>Creche do N.E.M.L.</h1>
-                <div id="div-button-new">
-                    <Button color="primary" onClick={handleShowFormModal} style={{marginRight:'32px'}} disabled={!buttonEnabled}>
-                        <MdAddCircle style={{marginBottom:'4px'}}/> Novo 
-                    </Button>   
+                <div id="div-buttons" style={{ display: 'flex', alignItems: 'center' }}>
+                    <div id="div-button-new" style={{ marginRight: '2px' }}>
+                        <Button color="primary" onClick={handleShowFormModal} style={{textAlign: 'right', marginRight:'0px'}} disabled={!buttonEnabled}>
+                            <MdAddCircle style={{marginBottom:'4px'}}/> Novo 
+                        </Button>   
+                    </div>
+                    <div id="div-button-permissions">
+                        <Button class="btn btn-outline-success" onClick={handleShowFormModalUsers} style={{textAlign: 'right', marginLeft:'2px', marginRight:'3px'}} disabled={!buttonEnabled}>
+                            <MdSettings  style={{marginBottom:'2px'}}/> 
+                        </Button>   
+                    </div>
                 </div>
             </div>
             
